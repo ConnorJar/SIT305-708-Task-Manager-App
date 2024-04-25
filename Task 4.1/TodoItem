@@ -1,0 +1,102 @@
+package com.application.a2sit30541;
+
+import android.os.Parcel;
+import android.os.Parcelable;
+import java.util.Date;
+
+public class TodoItem implements Parcelable {
+    private long id; // A unique identifier for the TodoItem
+    private String title; // Title of the TodoItem
+    private String task; // Description of the TodoItem
+    private Date dueDate; // Due date of the TodoItem
+
+    // This constructor initialises the TodoItem with the provided details
+    public TodoItem(long id, String title, String task, Date dueDate) {
+        this.id = id; // Sets the id
+        this.title = title; // Sets the title
+        this.task = task; // Sets the task
+        this.dueDate = dueDate; // Sets the due date
+    }
+
+    // A constructor for Parcelable implementation
+    protected TodoItem(Parcel in) {
+        id = in.readLong(); // Reads the id from Parcel
+        title = in.readString(); // Reads the title from Parcel
+        task = in.readString(); // Reads the task from Parcel
+        dueDate = (Date) in.readSerializable(); // Reads the due date from Parcel
+    }
+
+    // A parcelable Creator for TodoItem
+    public static final Creator<TodoItem> CREATOR = new Creator<TodoItem>() {
+        @Override
+        public TodoItem createFromParcel(Parcel in) {
+            return new TodoItem(in);
+        }
+
+        @Override
+        public TodoItem[] newArray(int size) {
+            return new TodoItem[size];
+        }
+    };
+
+    // Getter method for id
+    public long getId() {
+        return id;
+    }
+
+    // Getter method for title
+    public String getTitle() {
+        return title;
+    }
+
+    // Getter method for task
+    public String getTask() {
+        return task;
+    }
+
+    // Getter method for dueDate
+    public Date getDueDate() {
+        return dueDate;
+    }
+
+    // Setter method for title
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    // Setter method for task
+    public void setTask(String task) {
+        this.task = task;
+    }
+
+    // Setter method for dueDate
+    public void setDueDate(Date dueDate) {
+        this.dueDate = dueDate;
+    }
+
+    // String representation of TodoItem
+    @Override
+    public String toString() {
+        // Formats the task with the due date if available
+        if (dueDate != null) {
+            return task + " (Due: " + dueDate.toString() + ")";
+        } else {
+            return task;
+        }
+    }
+
+    // Describes the contents for Parcelable
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    // Writes the object data to the Parcel
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeLong(id); // Write id to Parcel
+        dest.writeString(title); // Write title to Parcel
+        dest.writeString(task); // Write task to Parcel
+        dest.writeSerializable(dueDate); // Write due date to Parcel
+    }
+}
