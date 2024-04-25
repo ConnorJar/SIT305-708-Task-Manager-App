@@ -1,0 +1,40 @@
+package com.application.a2sit30541;
+
+import android.content.Context;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
+import android.widget.TextView;
+
+import java.util.List;
+
+public class TodoAdapter extends ArrayAdapter<TodoItem> {
+
+    // Constructor
+    public TodoAdapter(Context context, List<TodoItem> items) {
+        super(context, 0, items);
+    }
+
+    @Override
+    public View getView(int position, View convertView, ViewGroup parent) {
+        // Get the TodoItem from the specified position
+        TodoItem item = getItem(position);
+
+        // Inflates the layout if convertView is null
+        if (convertView == null) {
+            convertView = LayoutInflater.from(getContext()).inflate(android.R.layout.simple_list_item_2, parent, false);
+        }
+
+        // Gets the references to TextViews in the layout
+        TextView titleTextView = convertView.findViewById(android.R.id.text1);
+        TextView taskTextView = convertView.findViewById(android.R.id.text2);
+
+        // Sets the text of TextViews with TodoItem details
+        titleTextView.setText(item.getTitle()); // Sets the title
+        taskTextView.setText(item.getTask()); // Sets the task description
+
+        // Returns the updated convertView
+        return convertView;
+    }
+}
