@@ -1,0 +1,29 @@
+package com.application.a2sit30541.db;
+
+import android.provider.BaseColumns;
+
+// The TaskContract class defines the structure for the database table that is used for storing tasks in the app
+public class TaskContract {
+
+    private TaskContract() {
+    }
+
+    // TaskEntry that implements the BaseColumns interface
+    public static class TaskEntry implements BaseColumns {
+
+        // A constant for the name of the table in the database
+        public static final String TABLE_NAME = "tasks";
+
+        // A constant for the name of the column storing the task titles
+        public static final String COLUMN_TITLE = "title";
+
+        // A constant for the name of the column storing the task descriptions
+        public static final String COLUMN_DESCRIPTION = "description";
+
+        // A constant for the name of the column storing the task due dates
+        public static final String COLUMN_DUE_DATE = "due_date";
+
+        // A constant for the name of the column storing timestamps
+        public static final String COLUMN_TIMESTAMP = "timestamp";
+    }
+}
