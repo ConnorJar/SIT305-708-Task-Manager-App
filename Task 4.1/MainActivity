@@ -1,0 +1,255 @@
+package com.application.a2sit30541;
+
+import android.app.AlertDialog;
+import android.app.DatePickerDialog;
+import android.content.ContentValues;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.os.Bundle;
+import android.util.Log;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.Button;
+import android.widget.DatePicker;
+import android.widget.EditText;
+import android.widget.ListView;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
+import com.application.a2sit30541.db.TaskContract;
+import com.application.a2sit30541.db.TaskDBHelper;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
+
+public class MainActivity extends AppCompatActivity {
+    private static final int EDIT_TASK_REQUEST_CODE = 1; // Defines a constant for the edit task request code
+    private ListView todoListView; // Declares ListView for displaying tasks
+    private EditText todoTitleEditText; // Declares EditText for task title input
+    private EditText todoEditText; // Declares EditText for task description input
+    private Button addButton, editButton, deleteButton, dueDateButton; // Declares Buttons for adding, editing, and deleting tasks, and setting due date
+    private TodoAdapter adapter; // Declares adapter for populating ListView with tasks
+    private ArrayList<TodoItem> todoItems; // Declares ArrayList to store TodoItems
+    private int selectedPosition = -1; // Declares variable to store position of selected task
+    private Calendar calendar; // Declares Calendar for handling date operations
+    private TaskDBHelper dbHelper; // Declares TaskDBHelper for database operations
+    private AlertDialog alertDialog; // Declares AlertDialog for displaying alert messages
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) { // The method is called when activity is first created
+        super.onCreate(savedInstanceState); // Calls superclass method
+        setContentView(R.layout.activity_main); // Sets activity layout
+
+        dbHelper = new TaskDBHelper(this); // Initialises TaskDBHelper with context
+
+        todoListView = findViewById(R.id.todo_list); // Gets reference to ListView
+        todoTitleEditText = findViewById(R.id.todo_title_edittext); // Gets reference to EditText for title input
+        todoEditText = findViewById(R.id.todo_edittext); // Gets reference to EditText for task input
+        addButton = findViewById(R.id.add_button); // Gets reference to Add Button
+        editButton = findViewById(R.id.edit_button); // Gets reference to Edit Button
+        deleteButton = findViewById(R.id.delete_button); // Gets reference to Delete Button
+        dueDateButton = findViewById(R.id.due_date_button); // Gets reference to Due Date Button
+
+        todoItems = new ArrayList<>(); // Initialises ArrayList for todoItems
+        adapter = new TodoAdapter(this, todoItems); // Initialises TodoAdapter with context and todoItems
+        todoListView.setAdapter(adapter); // Sets the adapter for todoListView
+
+        addButton.setOnClickListener(new View.OnClickListener() { // Sets OnClickListener for the Add Button
+            @Override
+            public void onClick(View v) { // This method is called when the Add Button is clicked
+                String title = todoTitleEditText.getText().toString().trim(); // Gets the task title from EditText
+                String task = todoEditText.getText().toString().trim(); // Gets the task description from EditText
+                Date dueDate = calendar != null ? calendar.getTime() : null; // Gets the selected due date
+
+                // Validate user input
+                if (title.isEmpty()) { // If the title is empty
+                    showErrorMessage("Error", "Please enter a title"); // Shows an error message
+                    return;
+                }
+
+                if (task.isEmpty()) { // If the task is empty
+                    showErrorMessage("Error", "Please enter a task"); // Shows an error message
+                    return;
+                }
+
+                if (dueDate == null) { // If the due date is not selected
+                    showErrorMessage("Error", "Please select a due date"); // Shows an error message
+                    return;
+                }
+
+                // Formats the task text to include the due date
+                SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()); // Create the date format
+                String dueDateString = dateFormat.format(dueDate); // Formats the due date as string
+                String fullTask = task + " (Due: " + dueDateString + ")"; // Links the task and due date
+
+                // Add task to database
+                TodoItem newTodo = new TodoItem(0, title, fullTask, dueDate); // Creates a new TodoItem
+                addTaskToDatabase(newTodo); // Adds the task to the database
+
+                // Update UI
+                todoItems.add(0, newTodo); // Adds a new task to the beginning of the list
+                adapter.notifyDataSetChanged(); // Notifies the adapter of data change
+                todoTitleEditText.setText(""); // Clears the title EditText
+                todoEditText.setText(""); // Clears the task EditText
+                dueDateButton.setText("Set Due Date"); // Resets the due date button text
+                calendar = null; // Resets the calendar
+            }
+        });
+
+        editButton.setOnClickListener(new View.OnClickListener() { // Sets the OnClickListener for the Edit Button
+            @Override
+            public void onClick(View v) { // This method is called when the Edit Button is clicked
+                // Check if a task is selected
+                if (selectedPosition != -1) { // If a task is selected
+                    TodoItem selectedTodo = todoItems.get(selectedPosition); // Gets the selected TodoItem
+                    Intent intent = new Intent(MainActivity.this, EditTaskActivity.class); // Creates an intent to start EditTaskActivity
+                    intent.putExtra("todoItem", selectedTodo); // Passes the selected TodoItem to EditTaskActivity
+                    startActivityForResult(intent, EDIT_TASK_REQUEST_CODE); // Starts the EditTaskActivity for a result
+                } else { // If no task is selected
+                    showErrorMessage("Error", "Please select a task to edit."); // Shows an error message
+                }
+            }
+        });
+
+        deleteButton.setOnClickListener(new View.OnClickListener() { // Sets the OnClickListener for the Delete Button
+            @Override
+            public void onClick(View v) { // This method is called when Delete Button is clicked
+                // Check if a task is selected
+                if (selectedPosition != -1) { // If a task is selected
+                    TodoItem selectedTodo = todoItems.get(selectedPosition); // Gets the selected TodoItem
+                    deleteTaskFromDatabase(selectedTodo); // Deletes the task from database
+                    todoItems.remove(selectedPosition); // Removes the task from list
+                    adapter.notifyDataSetChanged(); // Notifies the adapter of data change
+                    selectedPosition = -1; // Resets the selected position
+                } else { // If no task is selected
+                    showErrorMessage("Error", "Please select a task to delete."); // Shows an error message
+                }
+            }
+        });
+
+        dueDateButton.setOnClickListener(new View.OnClickListener() { // Sets the OnClickListener for the Due Date Button
+            @Override
+            public void onClick(View v) { // This method is called when the Due Date Button is clicked
+                showDatePickerDialog(); // Shows a date picker dialog
+            }
+        });
+
+        todoListView.setOnItemClickListener(new AdapterView.OnItemClickListener() { // Sets the OnItemClickListener for todoListView
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) { // This method is called when an item is clicked
+                selectedPosition = position; // Sets the selected position
+                editButton.setEnabled(true); // Enables the edit button
+            }
+        });
+
+        loadTasksFromDatabase(); // Loads the tasks from the database
+        calendar = Calendar.getInstance(); // Gets an instance of the Calendar
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) { // This method is called when an activity receives a result
+        super.onActivityResult(requestCode, resultCode, data); // Calls the superclass method
+        if (requestCode == EDIT_TASK_REQUEST_CODE && resultCode == RESULT_OK && data != null) { // If a result is from EditTaskActivity and is successful
+            TodoItem updatedTodo = data.getParcelableExtra("updatedTodoItem"); // Gets an updated TodoItem from the intent
+            if (updatedTodo != null) { // If the updatedTodo is not null
+                todoItems.set(selectedPosition, updatedTodo); // Updates the todoItems with the updatedTodo
+                adapter.notifyDataSetChanged(); // Notifies the adapter of data change
+            }
+        }
+    }
+
+    private void showDatePickerDialog() { // This method shows the date picker dialog
+        if (calendar == null) { // If the calendar is null
+            calendar = Calendar.getInstance(); // Gets an instance of the Calendar
+        }
+
+        DatePickerDialog datePickerDialog = new DatePickerDialog( // Creates a new DatePickerDialog
+            this, // Context
+            new DatePickerDialog.OnDateSetListener() { // Listener for the date selection
+                @Override
+                public void onDateSet(DatePicker view, int year, int monthOfYear, int dayOfMonth) { // This method is called when the date is set
+                    calendar.set(Calendar.YEAR, year); // Sets the year in the calendar
+                    calendar.set(Calendar.MONTH, monthOfYear); // Sets the month in the calendar
+                    calendar.set(Calendar.DAY_OF_MONTH, dayOfMonth); // Sets the day of month in the calendar
+                    dueDateButton.setText(formatDate(calendar.getTime())); // Sets the text of dueDateButton with the selected date
+                }
+            },
+            calendar.get(Calendar.YEAR), // Initial year
+            calendar.get(Calendar.MONTH), // Initial month
+            calendar.get(Calendar.DAY_OF_MONTH) // Initial day of the month
+        );
+        datePickerDialog.show(); // Shows the date picker dialog
+    }
+
+    private void addTaskToDatabase(TodoItem todoItem) { // This method adds the task to database
+        SQLiteDatabase database = dbHelper.getWritableDatabase(); // Gets the writable database
+        ContentValues values = new ContentValues(); // Creates a ContentValues object
+        values.put(TaskContract.TaskEntry.COLUMN_TITLE, todoItem.getTitle()); // Puts the title in ContentValues
+        values.put(TaskContract.TaskEntry.COLUMN_DESCRIPTION, todoItem.getTask()); // Puts the description in ContentValues
+        values.put(TaskContract.TaskEntry.COLUMN_DUE_DATE, todoItem.getDueDate().getTime()); // Puts the due date in ContentValues
+        database.insert(TaskContract.TaskEntry.TABLE_NAME, null, values); // Inserts the values into database
+    }
+
+    private void deleteTaskFromDatabase(TodoItem todoItem) { // This method deletes the task from database
+        SQLiteDatabase database = dbHelper.getWritableDatabase(); // Gets the writable database
+        String selection = TaskContract.TaskEntry._ID + "=?"; // Defines the selection string
+        String[] selectionArgs = {String.valueOf(todoItem.getId())}; // Defines the selection arguments
+        database.delete(TaskContract.TaskEntry.TABLE_NAME, selection, selectionArgs); // Deletes the task from database
+    }
+
+    private String formatDate(Date date) { // This method formats the date as a string
+        SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()); // Creates a date format
+        return dateFormat.format(date); // Formats the date and returns it as string
+    }
+
+    private void showErrorMessage(String title, String message) { // This method shows an error message dialog
+        AlertDialog.Builder builder = new AlertDialog.Builder(this); // Creates an AlertDialog.Builder
+        builder.setTitle(title); // Sets the title of dialog
+        builder.setMessage(message); // Sets the message of dialog
+        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() { // Sets the positive button
+            @Override
+            public void onClick(DialogInterface dialog, int which) { // This method is called when the button is clicked
+                dialog.dismiss(); // Dismisses the dialog
+            }
+        });
+        builder.show(); // Shows the dialog
+    }
+
+    private void loadTasksFromDatabase() { // This method loads the tasks from the database
+        todoItems.clear(); // Clears the todoItems list
+
+        SQLiteDatabase database = dbHelper.getReadableDatabase(); // Gets the readable database
+        Cursor cursor = database.query(TaskContract.TaskEntry.TABLE_NAME, // Queries the database for all tasks
+            null,
+            null,
+            null,
+            null,
+            null,
+            TaskContract.TaskEntry.COLUMN_TIMESTAMP + " DESC");
+
+        // Log column indices
+        int idIndex = cursor.getColumnIndex(TaskContract.TaskEntry._ID); // Gets the index of ID column
+        int titleIndex = cursor.getColumnIndex(TaskContract.TaskEntry.COLUMN_TITLE); // Gets the index of title column
+        int descriptionIndex = cursor.getColumnIndex(TaskContract.TaskEntry.COLUMN_DESCRIPTION); // Gets the index of description column
+        int dueDateIndex = cursor.getColumnIndex(TaskContract.TaskEntry.COLUMN_DUE_DATE); // Gets the index of due date column
+
+        Log.d("CursorIndices", "ID Index: " + idIndex); // Logs the ID index
+        Log.d("CursorIndices", "Title Index: " + titleIndex); // Logs the title index
+        Log.d("CursorIndices", "Description Index: " + descriptionIndex); // Logs the description index
+        Log.d("CursorIndices", "Due Date Index: " + dueDateIndex); // Logs the due date index
+
+        while (cursor.moveToNext()) { // Iterates over the cursor results
+            long id = cursor.getLong(idIndex); // Gets the ID from the cursor
+            String title = cursor.getString(titleIndex); // Gets the title from the cursor
+            String task = cursor.getString(descriptionIndex); // Gets the description from the cursor
+            long dueDateTimestamp = cursor.getLong(dueDateIndex); // Gets the due date timestamp from the cursor
+            Date dueDate = new Date(dueDateTimestamp); // Creates a Date object from the timestamp
+
+            todoItems.add(new TodoItem(id, title, task, dueDate)); // Adds a TodoItem to the todoItems list
+        }
+        cursor.close(); // Closes the cursor
+    }
+}
